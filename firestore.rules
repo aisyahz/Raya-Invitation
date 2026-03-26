@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: messages
+    // Fields:
+    //   - name: string (required, 1-100 chars)
+    //   - message: string (required, 1-500 chars)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: rsvp
+    // Fields:
+    //   - name: string (required, 1-100 chars)
+    //   - attendance: string (required, enum: ['Hadir', 'Tidak Hadir'])
+    //   - pax: number (required, 1-10)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "saisyah.zainal@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidMessage(data) {
+      return data.name is string && data.name.size() >= 1 &&
+             data.message is string && data.message.size() >= 1 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidRSVP(data) {
+      return data.keys().hasAll(['name', 'attendance', 'pax', 'time', 'createdAt']) &&
+             data.keys().hasOnly(['name', 'attendance', 'pax', 'time', 'message', 'createdAt']) &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.attendance in ['Hadir', 'Tidak Hadir'] &&
+             data.pax is number && data.pax >= 1 && data.pax <= 10 &&
+             data.time is string &&
+             (!('message' in data) || data.message is string) &&
+             data.createdAt is timestamp;
+    }
+
+    // Rules
+    match /messages/{messageId} {
+      // Allow anyone to read messages (it's a public wall)
+      allow read: if true;
+      // Allow anyone to create a message (guestbook)
+      allow create: if isValidMessage(request.resource.data);
+      // No updates or deletes allowed for guests
+      allow update, delete: if isAdmin();
+    }
+
+    match /rsvp/{rsvpId} {
+      // Simple password-protected admin page uses this
+      allow read: if true;
+      // Allow anyone to submit RSVP
+      allow create: if isValidRSVP(request.resource.data);
+      // Only admin can update/delete
+      allow update, delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAdmin();
+    }
+  }
+}

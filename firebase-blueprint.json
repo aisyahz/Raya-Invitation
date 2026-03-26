@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "Message": {
+      "title": "Message",
+      "description": "A well-wish message from a guest.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the guest."
+        },
+        "message": {
+          "type": "string",
+          "description": "The well-wish message."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The time the message was created."
+        }
+      },
+      "required": ["name", "message", "createdAt"]
+    },
+    "RSVP": {
+      "title": "RSVP",
+      "description": "An RSVP response from a guest.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the guest."
+        },
+        "attendance": {
+          "type": "string",
+          "enum": ["Hadir", "Tidak Hadir"],
+          "description": "Whether the guest is attending."
+        },
+        "pax": {
+          "type": "integer",
+          "description": "The number of people attending."
+        },
+        "time": {
+          "type": "string",
+          "description": "The estimated time of arrival."
+        },
+        "message": {
+          "type": "string",
+          "description": "An optional message from the guest."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The time the RSVP was submitted."
+        }
+      },
+      "required": ["name", "attendance", "pax", "time", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Collection of guest messages."
+    },
+    "/rsvp/{rsvpId}": {
+      "schema": "RSVP",
+      "description": "Collection of RSVP responses."
+    }
+  }
+}

@@ -8,9 +8,71 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef } from 'react';
-import { motion, useScroll, useTransform, AnimatePresence, MotionValue } from 'motion/react';
-import { MapPin, Calendar, Clock, CheckCircle2, ChevronDown, Home, Sparkles, User, Users, MessageSquare, Music, Music2, Volume2, VolumeX } from 'lucide-react';
+import React, { Component, useState, useRef, useEffect, ErrorInfo, ReactNode } from 'react';
+import { motion, useScroll, useTransform, AnimatePresence } from 'motion/react';
+import { MapPin, Calendar, Clock, CheckCircle2, ChevronDown, Sparkles, Volume2, VolumeX, Music, Music2, AlertCircle, User, Users, MessageSquare, Lock, Shield, LogOut, Download, FileText, Table } from 'lucide-react';
+import { db, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, OperationType, handleFirestoreError } from './firebase';
+
+// --- ERROR BOUNDARY ---
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends (Component as any) {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+
+  render() {
+    const { hasError, error } = this.state as any;
+    if (hasError) {
+      let errorMessage = "Something went wrong.";
+      try {
+        const parsedError = JSON.parse(error?.message || "{}");
+        if (parsedError.error) {
+          errorMessage = `Firestore Error: ${parsedError.error} during ${parsedError.operationType} on ${parsedError.path}`;
+        }
+      } catch (e) {
+        errorMessage = error?.message || errorMessage;
+      }
+
+      return (
+        <div className="min-h-screen bg-[#0A1A0A] flex items-center justify-center p-8 text-center">
+          <div className="max-w-md w-full bg-[#FDF6EC] p-10 paper-shadow rounded-sm space-y-6">
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
+            <h2 className="text-2xl font-serif italic text-[#1A2F1A]">Oops! Sesuatu tidak kena.</h2>
+            <p className="text-sm text-[#5A5A40] font-sans opacity-80 leading-relaxed">
+              {errorMessage}
+            </p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full bg-[#1A2F1A] text-white py-3 px-6 rounded-sm text-[10px] font-mono uppercase tracking-widest hover:bg-[#2D3F2D] transition-all"
+            >
+              Cuba Lagi / Refresh
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (this.props as any).children;
+  }
+}
 
 // --- COMPONENTS ---
 
@@ -159,35 +221,62 @@ const Fireflies = ({ count = 15 }: { count?: number }) => (
 );
 
 const GuestWall = () => {
-  const [notes, setNotes] = useState([
-    { id: 1, name: 'Zainal', message: 'Selamat Hari Raya! Semoga ceria selalu di samping keluarga tercinta.', rotate: -3, x: 0, y: 0, color: '#FFF9E5' },
-    { id: 2, name: 'Saisyah', message: 'Maaf Zahir & Batin. Rindu nak makan ketupat dan rendang Mak!', rotate: 4, x: 85, y: -2, color: '#FDF6EC' },
-    { id: 3, name: 'Ahmad', message: 'Teratak Arshad & Suraya sentiasa di hati. Jumpa nanti kawan-kawan!', rotate: -2, x: 45, y: 35, color: '#FFF4E0' },
-    { id: 4, name: 'Fatimah', message: 'Semoga Syawal kali ini membawa seribu rahmat buat kita semua.', rotate: 2, x: -2, y: 65, color: '#FFF9E5' },
-    { id: 5, name: 'Hafiz', message: 'Tak sabar nak beraya di Teratak Arshad & Suraya! See you guys soon!', rotate: -4, x: 90, y: 60, color: '#FDF6EC' },
-    { id: 6, name: 'Aminah', message: 'Raya kali ini pasti lebih bermakna. Maaf Zahir Batin!', rotate: 3, x: 12, y: 15, color: '#FFF4E0' },
-    { id: 7, name: 'Kamal', message: 'Selamat Hari Raya Aidilfitri kepada semua!', rotate: -1, x: 65, y: 75, color: '#FFF9E5' },
-    { id: 8, name: 'Siti', message: 'Meriahnya raya tahun ni! Jumpa di Teratak Arshad & Suraya!', rotate: 5, x: 30, y: 2, color: '#FDF6EC' },
-    { id: 9, name: 'Johari', message: 'Semoga ikatan kekeluargaan kita semakin erat.', rotate: -3, x: 72, y: 22, color: '#FFF4E0' },
-  ]);
+  const [notes, setNotes] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newNote, setNewNote] = useState({ name: '', message: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const q = query(collection(db, 'messages'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log('GuestWall snapshot received:', snapshot.size, 'messages');
+      const colors = ['#FFF9E5', '#FDF6EC', '#FFF4E0'];
+      const fetchedNotes = snapshot.docs.map((doc, index) => {
+        const data = doc.data();
+        // Use a stable seed for random positioning based on doc ID
+        const seed = doc.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        return {
+          id: doc.id,
+          name: data.name,
+          message: data.message,
+          rotate: (seed % 10) - 5,
+          x: (seed % 85) + 2,
+          y: ((seed * 7) % 85) + 2,
+          color: colors[seed % colors.length]
+        };
+      });
+      setNotes(fetchedNotes);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'messages');
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newNote.name && newNote.message) {
-      const colors = ['#FFF9E5', '#FDF6EC', '#FFF4E0'];
-      const note = {
-        id: Date.now(),
-        ...newNote,
-        rotate: Math.random() * 10 - 5,
-        x: Math.random() * 85 + 2,
-        y: Math.random() * 85 + 2,
-        color: colors[Math.floor(Math.random() * colors.length)]
-      };
-      setNotes([...notes, note]);
-      setNewNote({ name: '', message: '' });
-      setIsModalOpen(false);
+      setIsSubmitting(true);
+      setError(null);
+      try {
+        const payload = {
+          name: newNote.name,
+          message: newNote.message,
+          createdAt: serverTimestamp()
+        };
+        console.log('Submitting message:', payload);
+        const docRef = await addDoc(collection(db, 'messages'), payload);
+        console.log('Message submitted successfully with ID:', docRef.id);
+        setNewNote({ name: '', message: '' });
+        setIsModalOpen(false);
+      } catch (err: any) {
+        console.error('GuestWall submission error:', err);
+        setError(err.message || 'Failed to submit message');
+        handleFirestoreError(err, OperationType.CREATE, 'messages');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -200,7 +289,7 @@ const GuestWall = () => {
       className="relative w-full flex flex-col items-center justify-center px-4 md:px-8 lg:px-16"
     >
       <div className="text-center space-y-1 mb-4 relative z-10">
-        <h2 className="text-3xl lg:text-4xl font-serif italic text-[#FDF6EC]">Ucapan & Doa</h2>
+        <h2 className="text-3xl lg:text-4xl font-serif italic text-[#C5A059]">Ucapan & Doa</h2>
         <p className="text-[8px] text-[#C5A059] uppercase tracking-[0.4em] font-mono">Dinding Ingatan</p>
         <div className="w-12 h-[1px] bg-[#C5A059] mx-auto" />
       </div>
@@ -251,6 +340,12 @@ const GuestWall = () => {
 
         {/* Floating Fireflies in Wall */}
         <Fireflies count={10} />
+
+        {notes.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <p className="text-[#C5A059]/40 font-serif italic text-sm">Belum ada ucapan. Jadilah yang pertama!</p>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 relative z-10">
@@ -288,6 +383,11 @@ const GuestWall = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {error && (
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-[10px] font-mono rounded-sm">
+                      {error}
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <label className="text-[9px] font-mono uppercase tracking-widest text-[#8B8B7A]">Nama / Name</label>
                     <input 
@@ -312,9 +412,10 @@ const GuestWall = () => {
                   </div>
                   <button 
                     type="submit"
-                    className="w-full bg-[#1A2F1A] text-white py-4 px-8 rounded-sm text-[10px] font-mono uppercase tracking-[0.3em] hover:bg-[#2D3F2D] transition-all"
+                    disabled={isSubmitting}
+                    className="w-full bg-[#1A2F1A] text-white py-4 px-8 rounded-sm text-[10px] font-mono uppercase tracking-[0.3em] hover:bg-[#2D3F2D] transition-all disabled:opacity-50"
                   >
-                    Sematkan Ucapan
+                    {isSubmitting ? 'Menghantar...' : 'Sematkan Ucapan'}
                   </button>
                 </form>
               </div>
@@ -329,6 +430,167 @@ const GuestWall = () => {
 // --- MAIN APP ---
 
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <WeddingApp />
+    </ErrorBoundary>
+  );
+}
+
+const AdminView = ({ onLogout }: { onLogout: () => void }) => {
+  const [rsvps, setRsvps] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, 'rsvp'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedRsvps = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setRsvps(fetchedRsvps);
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'rsvp');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const totalPax = rsvps.reduce((acc, curr) => acc + (curr.attendance === 'Hadir' ? (curr.pax || 0) : 0), 0);
+  const totalHadir = rsvps.filter(r => r.attendance === 'Hadir').length;
+  const totalTidakHadir = rsvps.filter(r => r.attendance === 'Tidak Hadir').length;
+
+  const exportToCSV = () => {
+    const headers = ['Nama', 'Kehadiran', 'Pax', 'Masa', 'Pesanan', 'Tarikh'];
+    const rows = rsvps.map(r => [
+      r.name,
+      r.attendance,
+      r.pax,
+      r.time,
+      r.message?.replace(/,/g, ' '),
+      r.createdAt?.toDate?.()?.toLocaleString() || ''
+    ]);
+    
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n" 
+      + rows.map(e => e.join(",")).join("\n");
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "rsvp_list.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#FDF6EC] p-4 md:p-8 lg:p-12 font-serif">
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#C5A059]/20 pb-8">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-serif italic text-[#1A2F1A] flex items-center gap-3">
+              <Shield className="text-[#C5A059]" />
+              Admin Dashboard
+            </h1>
+            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-[#8B8B7A]">Pengurusan RSVP Teratak Arshad & Suraya</p>
+          </div>
+          <div className="flex gap-3">
+            <button 
+              onClick={exportToCSV}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-[#C5A059]/20 rounded-sm text-[10px] font-mono uppercase tracking-widest text-[#1A2F1A] hover:bg-[#FDF6EC] transition-colors"
+            >
+              <Download size={14} /> Export CSV
+            </button>
+            <button 
+              onClick={onLogout}
+              className="flex items-center gap-2 px-4 py-2 bg-[#1A2F1A] rounded-sm text-[10px] font-mono uppercase tracking-widest text-white hover:bg-[#2D3F2D] transition-colors"
+            >
+              <LogOut size={14} /> Log Keluar
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-sm paper-shadow border border-[#C5A059]/10 space-y-2">
+            <p className="text-[9px] font-mono uppercase tracking-widest text-[#8B8B7A]">Jumlah Pax Hadir</p>
+            <p className="text-4xl font-serif italic text-[#1A2F1A]">{totalPax}</p>
+          </div>
+          <div className="bg-white p-6 rounded-sm paper-shadow border border-[#C5A059]/10 space-y-2">
+            <p className="text-[9px] font-mono uppercase tracking-widest text-[#8B8B7A]">Keluarga Hadir</p>
+            <p className="text-4xl font-serif italic text-[#1A2F1A]">{totalHadir}</p>
+          </div>
+          <div className="bg-white p-6 rounded-sm paper-shadow border border-[#C5A059]/10 space-y-2">
+            <p className="text-[9px] font-mono uppercase tracking-widest text-[#8B8B7A]">Tidak Hadir</p>
+            <p className="text-4xl font-serif italic text-[#8B8B7A]">{totalTidakHadir}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-sm paper-shadow border border-[#C5A059]/10 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#FDF6EC]/50 border-b border-[#C5A059]/10">
+                  <th className="p-4 text-[10px] font-mono uppercase tracking-widest text-[#8B8B7A]">Nama</th>
+                  <th className="p-4 text-[10px] font-mono uppercase tracking-widest text-[#8B8B7A]">Status</th>
+                  <th className="p-4 text-[10px] font-mono uppercase tracking-widest text-[#8B8B7A]">Pax</th>
+                  <th className="p-4 text-[10px] font-mono uppercase tracking-widest text-[#8B8B7A]">Masa</th>
+                  <th className="p-4 text-[10px] font-mono uppercase tracking-widest text-[#8B8B7A]">Pesanan</th>
+                  <th className="p-4 text-[10px] font-mono uppercase tracking-widest text-[#8B8B7A]">Tarikh</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#C5A059]/5">
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="p-12 text-center text-[#8B8B7A] font-mono text-[10px] uppercase tracking-widest">Memuatkan data...</td>
+                  </tr>
+                ) : rsvps.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-12 text-center text-[#8B8B7A] font-mono text-[10px] uppercase tracking-widest">Tiada rekod RSVP setakat ini.</td>
+                  </tr>
+                ) : (
+                  rsvps.map((r) => (
+                    <tr key={r.id} className="hover:bg-[#FDF6EC]/30 transition-colors">
+                      <td className="p-4 text-sm font-serif italic text-[#1A2F1A]">{r.name}</td>
+                      <td className="p-4">
+                        <span className={`text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded-full ${r.attendance === 'Hadir' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {r.attendance}
+                        </span>
+                      </td>
+                      <td className="p-4 text-sm font-mono text-[#1A2F1A]">{r.pax || '-'}</td>
+                      <td className="p-4 text-sm font-mono text-[#1A2F1A]">{r.time || '-'}</td>
+                      <td className="p-4 text-xs text-[#5A5A40] max-w-xs truncate" title={r.message}>{r.message || '-'}</td>
+                      <td className="p-4 text-[9px] font-mono text-[#8B8B7A]">{r.createdAt?.toDate?.()?.toLocaleString() || '-'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+function WeddingApp() {
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPassword === '180898') {
+      setIsAdminMode(true);
+      setAdminPassword('');
+      setIsLoggingIn(false);
+    } else {
+      alert('Kata laluan salah.');
+    }
+  };
+
   const [isRSVPed, setIsRSVPed] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -337,6 +599,9 @@ export default function App() {
     message: '',
     status: 'Hadir'
   });
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rsvpError, setRsvpError] = useState<string | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
@@ -351,17 +616,43 @@ export default function App() {
     ["#0A1A0A", "#1A2F1A", "#1A2F1A", "#5A5A40", "#5A5A40", "#3D2B1F", "#FDF6EC"]
   );
 
-  const handleRSVP = (e: React.FormEvent) => {
+  const scrollOpacity = useTransform(scrollYProgress, [0, 0.1], [1, 0]);
+
+  const handleRSVP = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.name) {
-      setIsRSVPed(true);
-      // Smooth scroll to success message
-      setTimeout(() => {
-        const successEl = document.getElementById('rsvp-success');
-        successEl?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      setIsSubmitting(true);
+      setRsvpError(null);
+      try {
+        const payload = {
+          name: formData.name,
+          attendance: formData.status,
+          pax: parseInt(formData.guests),
+          time: formData.time,
+          message: formData.message || '',
+          createdAt: serverTimestamp()
+        };
+        console.log('Submitting RSVP:', payload);
+        await addDoc(collection(db, 'rsvp'), payload);
+        setIsRSVPed(true);
+        // Smooth scroll to success message
+        setTimeout(() => {
+          const successEl = document.getElementById('rsvp-success');
+          successEl?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      } catch (err: any) {
+        console.error('RSVP submission error:', err);
+        setRsvpError(err.message || 'Failed to submit RSVP');
+        handleFirestoreError(err, OperationType.CREATE, 'rsvp');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
+
+  if (isAdminMode) {
+    return <AdminView onLogout={() => setIsAdminMode(false)} />;
+  }
 
   return (
     <motion.div 
@@ -427,7 +718,7 @@ export default function App() {
           </motion.p>
           
           <motion.div 
-            style={{ opacity: useTransform(scrollYProgress, [0, 0.1], [1, 0]) }}
+            style={{ opacity: scrollOpacity }}
             animate={{ y: [0, 10, 0] }}
             transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
             className="pt-16 flex flex-col items-center gap-3 text-[9px] font-mono uppercase tracking-[0.3em] text-[#C5A059]"
@@ -536,8 +827,22 @@ export default function App() {
           <div className="mt-6 flex flex-col md:flex-row justify-between items-center gap-4 px-4">
             <span className="text-[10px] font-mono uppercase tracking-widest text-[#8B8B7A]">Navigasi ke Teratak Arshad & Suraya</span>
             <div className="flex gap-4">
-              <button className="text-[10px] font-bold underline uppercase tracking-widest hover:text-[#C5A059] transition-colors">Google Maps</button>
-              <button className="text-[10px] font-bold underline uppercase tracking-widest hover:text-[#C5A059] transition-colors">Waze</button>
+              <a 
+                href="https://maps.google.com/?q=3.288342,101.366083" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-[10px] font-bold underline uppercase tracking-widest hover:text-[#C5A059] transition-colors"
+              >
+                Google Maps
+              </a>
+              <a 
+                href="https://ul.waze.com/ul?ll=3.28877059%2C101.36607528&navigate=yes&zoom=17&utm_campaign=default&utm_source=waze_website&utm_medium=lm_share_location" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-[10px] font-bold underline uppercase tracking-widest hover:text-[#C5A059] transition-colors"
+              >
+                Waze
+              </a>
             </div>
           </div>
         </motion.div>
@@ -579,6 +884,11 @@ export default function App() {
 
           {!isRSVPed ? (
             <form onSubmit={handleRSVP} className="space-y-10 relative z-10">
+              {rsvpError && (
+                <div className="p-4 bg-red-50 border border-red-200 text-red-600 text-[10px] font-mono rounded-sm">
+                  {rsvpError}
+                </div>
+              )}
               <div className="flex justify-center gap-8 mb-12">
                 {['Hadir', 'Tidak Hadir'].map((s) => (
                   <button
@@ -653,10 +963,11 @@ export default function App() {
               <div className="pt-6">
                 <button 
                   type="submit"
-                  className="w-full bg-[#1A2F1A] text-white py-6 px-10 rounded-sm text-[10px] font-mono uppercase tracking-[0.4em] hover:bg-[#2D3F2D] hover:shadow-[0_10px_30px_rgba(255,215,0,0.2)] transition-all active:scale-[0.98] flex items-center justify-center gap-4 group"
+                  disabled={isSubmitting}
+                  className="w-full bg-[#1A2F1A] text-white py-6 px-10 rounded-sm text-[10px] font-mono uppercase tracking-[0.4em] hover:bg-[#2D3F2D] hover:shadow-[0_10px_30px_rgba(255,215,0,0.2)] transition-all active:scale-[0.98] flex items-center justify-center gap-4 group disabled:opacity-50"
                 >
                   <Sparkles size={16} className="group-hover:rotate-12 transition-transform text-[#C5A059]" />
-                  Hantar Kehadiran
+                  {isSubmitting ? 'Menghantar...' : 'Hantar Kehadiran'}
                 </button>
               </div>
             </form>
@@ -750,6 +1061,63 @@ export default function App() {
         <div className="pt-12 text-[8px] font-mono uppercase tracking-[0.3em] text-[#8B8B7A] opacity-40">
           © 2026 Teratak Arshad dan Suraya • Diilhamkan dari Nostalgia
         </div>
+        <div className="pt-4 flex justify-center">
+          <button 
+            onClick={() => setIsLoggingIn(true)}
+            className="text-[8px] font-mono uppercase tracking-[0.3em] text-[#8B8B7A] opacity-20 hover:opacity-100 transition-opacity flex items-center gap-1"
+          >
+            <Lock size={8} /> Admin
+          </button>
+        </div>
+
+        <AnimatePresence>
+          {isLoggingIn && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-[#1A2F1A]/90 backdrop-blur-sm flex items-center justify-center p-4"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-[#FDF6EC] p-8 rounded-sm paper-shadow max-w-sm w-full space-y-6"
+              >
+                <div className="text-center space-y-2">
+                  <Lock className="mx-auto text-[#C5A059]" size={32} />
+                  <h2 className="text-xl font-serif italic text-[#1A2F1A]">Admin Access</h2>
+                  <p className="text-[9px] font-mono uppercase tracking-widest text-[#8B8B7A]">Sila masukkan kata laluan</p>
+                </div>
+                <form onSubmit={handleAdminLogin} className="space-y-4">
+                  <input 
+                    type="password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="••••••"
+                    className="w-full bg-white border border-[#C5A059]/20 p-3 text-center font-mono tracking-[0.5em] focus:outline-none focus:border-[#C5A059] transition-colors"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => setIsLoggingIn(false)}
+                      className="flex-1 py-3 text-[10px] font-mono uppercase tracking-widest text-[#8B8B7A] hover:text-[#1A2F1A] transition-colors"
+                    >
+                      Batal
+                    </button>
+                    <button 
+                      type="submit"
+                      className="flex-1 py-3 bg-[#1A2F1A] text-white text-[10px] font-mono uppercase tracking-widest hover:bg-[#2D3F2D] transition-colors"
+                    >
+                      Masuk
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </footer>
 
     </motion.div>
