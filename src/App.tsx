@@ -1061,6 +1061,40 @@ function WeddingApp() {
         <div className="pt-12 text-[8px] font-mono uppercase tracking-[0.3em] text-[#8B8B7A] opacity-40">
           © 2026 Teratak Arshad dan Suraya • Diilhamkan dari Nostalgia
         </div>
+        
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.2 }}
+          className="pt-12 space-y-4 border-t border-[#C5A059]/10 mt-12 max-w-lg mx-auto overflow-hidden"
+        >
+          <p className="text-[9px] font-mono uppercase tracking-[0.4em] text-[#8B8B7A] opacity-50">
+            Inginkan website seperti ini?
+          </p>
+          
+          <div className="relative py-2" style={{ maskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)' }}>
+            <motion.div 
+              animate={{ x: [0, -500] }}
+              transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+              className="flex whitespace-nowrap gap-16 text-[11px] font-serif italic text-[#C5A059]"
+            >
+              {[1, 2, 3].map((i) => (
+                <a 
+                  key={i}
+                  href="https://wa.me/60136648159" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:text-[#1A2F1A] transition-colors flex items-center gap-4"
+                >
+                  <span>Hubungi Aisyah (013-664 8159)</span>
+                  <span className="w-1 h-1 bg-[#C5A059]/30 rounded-full" />
+                  <span>Servis buat website serendah RM100</span>
+                </a>
+              ))}
+            </motion.div>
+          </div>
+        </motion.div>
+
         <div className="pt-4 flex justify-center">
           <button 
             onClick={() => setIsLoggingIn(true)}
