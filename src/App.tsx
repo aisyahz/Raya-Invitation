@@ -595,7 +595,7 @@ function WeddingApp() {
   const [formData, setFormData] = useState({
     name: '',
     guests: '1',
-    time: '12:00 PM',
+    time: '2:30 PM',
     message: '',
     status: 'Hadir'
   });
@@ -716,6 +716,21 @@ function WeddingApp() {
             "Sejauh mana pun kaki melangkah, <br />
             pulangnya tetap ke teratak yang satu."
           </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 1.5 }}
+            className="pt-4"
+          >
+            <button 
+              onClick={() => document.getElementById('rsvp-section')?.scrollIntoView({ behavior: 'smooth' })}
+              className="bg-[#C5A059] text-[#1A2F1A] py-4 px-10 rounded-sm text-[10px] font-mono uppercase tracking-[0.4em] hover:bg-[#D4B475] hover:shadow-[0_10px_30px_rgba(197,160,89,0.3)] transition-all active:scale-95 flex items-center gap-3 mx-auto group"
+            >
+              <CheckCircle2 size={14} className="group-hover:scale-110 transition-transform" />
+              RSVP Sekarang
+            </button>
+          </motion.div>
           
           <motion.div 
             style={{ opacity: scrollOpacity }}
@@ -769,7 +784,7 @@ function WeddingApp() {
                 <div className="space-y-8 pt-6">
                   {[
                     { icon: Calendar, label: "Tarikh / Date", value: "Sabtu, 11 April 2026" },
-                    { icon: Clock, label: "Masa / Time", value: "2:30 PM — 9:00 PM" },
+                    { icon: Clock, label: "Masa / Time", value: "2:30 PM — 9:00 PM", sub: "Majlis bermula tepat jam 2:30 petang" },
                     { icon: MapPin, label: "Lokasi / Location", value: "Teratak Arshad & Suraya", sub: "Lot Rumah 2172, Jalan Jaya, Kampung Parit Mahang, Ijok, Selangor" }
                   ].map((item, idx) => (
                     <motion.div 
@@ -849,7 +864,7 @@ function WeddingApp() {
       </section>
 
       {/* RSVP SECTION (THE GUESTBOOK) */}
-      <section className="relative min-h-screen flex flex-col justify-center px-8 lg:px-24 py-32 z-20 overflow-hidden">
+      <section id="rsvp-section" className="relative min-h-screen flex flex-col justify-center px-8 lg:px-24 py-32 z-20 overflow-hidden">
         {/* Background Wood Texture for RSVP */}
         <div className="absolute inset-0 bg-wood opacity-20 pointer-events-none" />
         
@@ -938,6 +953,7 @@ function WeddingApp() {
                 <label className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-widest text-[#8B8B7A]">
                   <Clock size={12} /> Masa Anggaran / Estimated Time
                 </label>
+                <div className="text-[10px] text-[#C5A059] font-serif italic mt-1">Nota: Majlis bermula tepat jam 2:30 petang</div>
                 <select 
                   value={formData.time}
                   onChange={(e) => setFormData({...formData, time: e.target.value})}
