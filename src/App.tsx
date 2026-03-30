@@ -257,6 +257,7 @@ const GuestWall = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('GuestWall handleSubmit triggered', { name: newNote.name, message: newNote.message });
     if (newNote.name && newNote.message) {
       setIsSubmitting(true);
       setError(null);
@@ -266,7 +267,7 @@ const GuestWall = () => {
           message: newNote.message,
           createdAt: serverTimestamp()
         };
-        console.log('Submitting message:', payload);
+        console.log('Submitting message payload:', payload);
         const docRef = await addDoc(collection(db, 'messages'), payload);
         console.log('Message submitted successfully with ID:', docRef.id);
         setNewNote({ name: '', message: '' });
@@ -278,144 +279,149 @@ const GuestWall = () => {
       } finally {
         setIsSubmitting(false);
       }
+    } else {
+      console.warn('GuestWall handleSubmit: Name or message is empty');
     }
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-100px" }}
-      transition={{ duration: 1 }}
-      className="relative w-full flex flex-col items-center justify-center px-4 md:px-8 lg:px-16"
-    >
-      <div className="text-center space-y-1 mb-4 relative z-10">
-        <h2 className="text-3xl lg:text-4xl font-serif italic text-[#C5A059]">Ucapan & Doa</h2>
-        <p className="text-[8px] text-[#C5A059] uppercase tracking-[0.4em] font-mono">Dinding Ingatan</p>
-        <div className="w-12 h-[1px] bg-[#C5A059] mx-auto" />
-      </div>
+    <>
+      <motion.div 
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-100px" }}
+        transition={{ duration: 1 }}
+        className="relative w-full flex flex-col items-center justify-center px-4 md:px-8 lg:px-16"
+      >
+        <div className="text-center space-y-1 mb-4 relative z-10">
+          <h2 className="text-3xl lg:text-4xl font-serif italic text-[#C5A059]">Ucapan & Doa</h2>
+          <p className="text-[8px] text-[#C5A059] uppercase tracking-[0.4em] font-mono">Dinding Ingatan</p>
+          <div className="w-12 h-[1px] bg-[#C5A059] mx-auto" />
+        </div>
 
-      <div className="relative w-full max-w-[1900px] h-[40vh] min-h-[300px] bg-[#FDF6EC]/40 rounded-sm border border-[#E6E6D4]/60 overflow-hidden paper-shadow group">
-        <div className="absolute inset-0 bg-noise opacity-5 pointer-events-none" />
-        
-        {/* Decorative Grid Lines */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
-             style={{ backgroundImage: 'radial-gradient(#1A2F1A 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+        <div className="relative w-full max-w-[1900px] h-[40vh] min-h-[300px] bg-[#FDF6EC]/40 rounded-sm border border-[#E6E6D4]/60 overflow-hidden paper-shadow group">
+          <div className="absolute inset-0 bg-noise opacity-5 pointer-events-none" />
+          
+          {/* Decorative Grid Lines */}
+          <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+               style={{ backgroundImage: 'radial-gradient(#1A2F1A 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
 
-        {/* Scattered Notes */}
-        <AnimatePresence>
-          {notes.map((note) => (
-            <motion.div
-              key={note.id}
-              initial={{ opacity: 0, scale: 0.8, y: 20 }}
-              animate={{ 
-                opacity: 1, 
-                scale: 1, 
-                y: [0, -8, 0],
-                rotate: note.rotate 
-              }}
-              transition={{ 
-                opacity: { duration: 0.6 },
-                scale: { duration: 0.6 },
-                y: { duration: 5 + Math.random() * 2, repeat: Infinity, ease: "easeInOut", delay: Math.random() * 2 }
-              }}
-              onClick={() => setSelectedNote(note)}
-              className="absolute p-5 md:p-7 w-44 md:w-56 lg:w-72 paper-shadow border-l-4 border-[#C5A059]/40 cursor-pointer hover:z-50 transition-all duration-500 hover:scale-110 active:scale-95"
-              style={{ 
-                left: `${note.x}%`, 
-                top: `${note.y}%`,
-                backgroundColor: note.color,
-                transform: `rotate(${note.rotate}deg)`
-              }}
-            >
-              <div className="absolute top-3 right-3 w-3 h-3 bg-[#C5A059]/30 rounded-full shadow-inner" />
-              <p className="text-sm md:text-base font-serif italic text-[#1A2F1A] leading-relaxed mb-5">
-                "{note.message}"
-              </p>
-              <div className="text-[10px] font-mono uppercase tracking-widest text-[#8B8B7A] border-t border-[#E6E6D4] pt-3 flex justify-between items-center">
-                <span>— {note.name}</span>
-                <Sparkles size={10} className="text-[#C5A059]/50" />
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        {/* Floating Fireflies in Wall */}
-        <Fireflies count={10} />
-
-        {/* Expanded Note Overlay */}
-        <AnimatePresence>
-          {selectedNote && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
-              onClick={() => setSelectedNote(null)}
-            >
+          {/* Scattered Notes */}
+          <AnimatePresence>
+            {notes.map((note) => (
               <motion.div
-                initial={{ scale: 0.8, y: 20, opacity: 0 }}
-                animate={{ scale: 1, y: 0, opacity: 1 }}
-                exit={{ scale: 0.8, y: 20, opacity: 0 }}
-                onClick={(e) => e.stopPropagation()}
-                className="relative p-8 md:p-12 w-full max-w-lg paper-shadow border-l-8 border-[#C5A059] overflow-hidden"
-                style={{ backgroundColor: selectedNote.color }}
+                key={note.id}
+                initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                animate={{ 
+                  opacity: 1, 
+                  scale: 1, 
+                  y: [0, -8, 0],
+                  rotate: note.rotate 
+                }}
+                transition={{ 
+                  opacity: { duration: 0.6 },
+                  scale: { duration: 0.6 },
+                  y: { duration: 5 + Math.random() * 2, repeat: Infinity, ease: "easeInOut", delay: Math.random() * 2 }
+                }}
+                onClick={() => setSelectedNote(note)}
+                className="absolute p-5 md:p-7 w-44 md:w-56 lg:w-72 paper-shadow border-l-4 border-[#C5A059]/40 cursor-pointer hover:z-50 transition-all duration-500 hover:scale-110 active:scale-95"
+                style={{ 
+                  left: `${note.x}%`, 
+                  top: `${note.y}%`,
+                  backgroundColor: note.color,
+                  transform: `rotate(${note.rotate}deg)`
+                }}
               >
-                <div className="absolute inset-0 bg-noise opacity-5 pointer-events-none" />
-                <button 
-                  onClick={() => setSelectedNote(null)}
-                  className="absolute top-4 right-4 p-2 text-[#1A2F1A]/40 hover:text-[#1A2F1A] transition-colors"
-                >
-                  <X size={24} />
-                </button>
-                <div className="absolute top-6 left-6 w-4 h-4 bg-[#C5A059]/30 rounded-full shadow-inner" />
-                
-                <p className="text-xl md:text-2xl font-serif italic text-[#1A2F1A] leading-relaxed mb-8 pt-4">
-                  "{selectedNote.message}"
+                <div className="absolute top-3 right-3 w-3 h-3 bg-[#C5A059]/30 rounded-full shadow-inner" />
+                <p className="text-sm md:text-base font-serif italic text-[#1A2F1A] leading-relaxed mb-5">
+                  "{note.message}"
                 </p>
-                
-                <div className="text-xs font-mono uppercase tracking-[0.2em] text-[#8B8B7A] border-t border-[#E6E6D4] pt-6 flex justify-between items-center">
-                  <span className="font-bold">— {selectedNote.name}</span>
-                  <Sparkles size={16} className="text-[#C5A059]" />
+                <div className="text-[10px] font-mono uppercase tracking-widest text-[#8B8B7A] border-t border-[#E6E6D4] pt-3 flex justify-between items-center">
+                  <span>— {note.name}</span>
+                  <Sparkles size={10} className="text-[#C5A059]/50" />
                 </div>
               </motion.div>
-            </motion.div>
+            ))}
+          </AnimatePresence>
+
+          {/* Floating Fireflies in Wall */}
+          <Fireflies count={10} />
+
+          {notes.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-[#C5A059]/40 font-serif italic text-sm">Belum ada ucapan. Jadilah yang pertama!</p>
+            </div>
           )}
-        </AnimatePresence>
+        </div>
 
-        {notes.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <p className="text-[#C5A059]/40 font-serif italic text-sm">Belum ada ucapan. Jadilah yang pertama!</p>
-          </div>
+        <div className="mt-4 relative z-10">
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-[#1A2F1A] text-white py-2.5 px-6 rounded-sm text-[8px] font-mono uppercase tracking-[0.4em] hover:bg-[#2D3F2D] hover:shadow-2xl transition-all active:scale-95 flex items-center gap-2 group"
+          >
+            <Sparkles size={10} className="group-hover:rotate-12 transition-transform text-[#C5A059]" />
+            Tinggalkan Ucapan
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Expanded Note Overlay */}
+      <AnimatePresence>
+        {selectedNote && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md"
+            onClick={() => setSelectedNote(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.8, y: 20, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative p-8 md:p-12 w-full max-w-lg paper-shadow border-l-8 border-[#C5A059] overflow-hidden"
+              style={{ backgroundColor: selectedNote.color }}
+            >
+              <div className="absolute inset-0 bg-noise opacity-5 pointer-events-none" />
+              <button 
+                onClick={() => setSelectedNote(null)}
+                className="absolute top-4 right-4 p-2 text-[#1A2F1A]/40 hover:text-[#1A2F1A] transition-colors"
+              >
+                <X size={24} />
+              </button>
+              <div className="absolute top-6 left-6 w-4 h-4 bg-[#C5A059]/30 rounded-full shadow-inner" />
+              
+              <p className="text-xl md:text-2xl font-serif italic text-[#1A2F1A] leading-relaxed mb-8 pt-4">
+                "{selectedNote.message}"
+              </p>
+              
+              <div className="text-xs font-mono uppercase tracking-[0.2em] text-[#8B8B7A] border-t border-[#E6E6D4] pt-6 flex justify-between items-center">
+                <span className="font-bold">— {selectedNote.name}</span>
+                <Sparkles size={16} className="text-[#C5A059]" />
+              </div>
+            </motion.div>
+          </motion.div>
         )}
-      </div>
-
-      <div className="mt-4 relative z-10">
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-[#1A2F1A] text-white py-2.5 px-6 rounded-sm text-[8px] font-mono uppercase tracking-[0.4em] hover:bg-[#2D3F2D] hover:shadow-2xl transition-all active:scale-95 flex items-center gap-2 group"
-        >
-          <Sparkles size={10} className="group-hover:rotate-12 transition-transform text-[#C5A059]" />
-          Tinggalkan Ucapan
-        </button>
-      </div>
+      </AnimatePresence>
 
       {/* Modal Form */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-8">
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-8">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-[#0A1A0A]/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#0A1A0A]/90 backdrop-blur-md"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-[#FDF6EC] p-8 lg:p-12 paper-shadow glow-edge rounded-sm"
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-md bg-[#FDF6EC] p-8 lg:p-12 paper-shadow glow-edge rounded-sm z-10"
             >
               <div className="absolute inset-0 bg-noise opacity-5 pointer-events-none" />
               <div className="relative z-10 space-y-8">
@@ -452,20 +458,22 @@ const GuestWall = () => {
                       className="w-full bg-transparent border-b border-[#E6E6D4] py-2 focus:outline-none focus:border-[#C5A059] transition-colors font-serif italic text-lg resize-none"
                     />
                   </div>
-                  <button 
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full bg-[#1A2F1A] text-white py-4 px-8 rounded-sm text-[10px] font-mono uppercase tracking-[0.3em] hover:bg-[#2D3F2D] transition-all disabled:opacity-50"
+                    className="w-full bg-[#1A2F1A] text-white py-4 px-8 rounded-sm text-[10px] font-mono uppercase tracking-[0.3em] hover:bg-[#2D3F2D] transition-all disabled:opacity-50 cursor-pointer pointer-events-auto shadow-lg"
                   >
                     {isSubmitting ? 'Menghantar...' : 'Sematkan Ucapan'}
-                  </button>
+                  </motion.button>
                 </form>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </>
   );
 };
 
