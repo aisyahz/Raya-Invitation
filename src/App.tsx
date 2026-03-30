@@ -959,7 +959,7 @@ function WeddingApp() {
                   onChange={(e) => setFormData({...formData, time: e.target.value})}
                   className="w-full bg-transparent border-b border-[#E6E6D4] py-3 focus:outline-none focus:border-[#C5A059] font-serif italic text-xl appearance-none cursor-pointer"
                 >
-                  {['2:30 PM', '3:30 PM', '4:30 PM', '5:30 PM', '6:30 PM', '7:30 PM', '8:30 PM'].map(t => <option key={t} value={t} className="bg-[#FDF6EC]">{t}</option>)}
+                  {['2:30 PM', '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM', '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM', '9:00 PM'].map(t => <option key={t} value={t} className="bg-[#FDF6EC]">{t}</option>)}
                 </select>
               </div>
 
