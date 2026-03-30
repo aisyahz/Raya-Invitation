@@ -10,7 +10,7 @@
 
 import React, { Component, useState, useRef, useEffect, ErrorInfo, ReactNode } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence } from 'motion/react';
-import { MapPin, Calendar, Clock, CheckCircle2, ChevronDown, Sparkles, Volume2, VolumeX, Music, Music2, AlertCircle, User, Users, MessageSquare, Lock, Shield, LogOut, Download, FileText, Table } from 'lucide-react';
+import { MapPin, Calendar, Clock, CheckCircle2, ChevronDown, Sparkles, Volume2, VolumeX, Music, Music2, AlertCircle, User, Users, MessageSquare, Lock, Shield, LogOut, Download, FileText, Table, X } from 'lucide-react';
 import { db, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, OperationType, handleFirestoreError } from './firebase';
 
 // --- ERROR BOUNDARY ---
@@ -223,6 +223,7 @@ const Fireflies = ({ count = 15 }: { count?: number }) => (
 const GuestWall = () => {
   const [notes, setNotes] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<any | null>(null);
   const [newNote, setNewNote] = useState({ name: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -318,7 +319,8 @@ const GuestWall = () => {
                 scale: { duration: 0.6 },
                 y: { duration: 5 + Math.random() * 2, repeat: Infinity, ease: "easeInOut", delay: Math.random() * 2 }
               }}
-              className="absolute p-5 md:p-7 w-44 md:w-56 lg:w-72 paper-shadow border-l-4 border-[#C5A059]/40 cursor-default hover:z-50 transition-all duration-500 hover:scale-105"
+              onClick={() => setSelectedNote(note)}
+              className="absolute p-5 md:p-7 w-44 md:w-56 lg:w-72 paper-shadow border-l-4 border-[#C5A059]/40 cursor-pointer hover:z-50 transition-all duration-500 hover:scale-110 active:scale-95"
               style={{ 
                 left: `${note.x}%`, 
                 top: `${note.y}%`,
@@ -340,6 +342,46 @@ const GuestWall = () => {
 
         {/* Floating Fireflies in Wall */}
         <Fireflies count={10} />
+
+        {/* Expanded Note Overlay */}
+        <AnimatePresence>
+          {selectedNote && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
+              onClick={() => setSelectedNote(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.8, y: 20, opacity: 0 }}
+                animate={{ scale: 1, y: 0, opacity: 1 }}
+                exit={{ scale: 0.8, y: 20, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative p-8 md:p-12 w-full max-w-lg paper-shadow border-l-8 border-[#C5A059] overflow-hidden"
+                style={{ backgroundColor: selectedNote.color }}
+              >
+                <div className="absolute inset-0 bg-noise opacity-5 pointer-events-none" />
+                <button 
+                  onClick={() => setSelectedNote(null)}
+                  className="absolute top-4 right-4 p-2 text-[#1A2F1A]/40 hover:text-[#1A2F1A] transition-colors"
+                >
+                  <X size={24} />
+                </button>
+                <div className="absolute top-6 left-6 w-4 h-4 bg-[#C5A059]/30 rounded-full shadow-inner" />
+                
+                <p className="text-xl md:text-2xl font-serif italic text-[#1A2F1A] leading-relaxed mb-8 pt-4">
+                  "{selectedNote.message}"
+                </p>
+                
+                <div className="text-xs font-mono uppercase tracking-[0.2em] text-[#8B8B7A] border-t border-[#E6E6D4] pt-6 flex justify-between items-center">
+                  <span className="font-bold">— {selectedNote.name}</span>
+                  <Sparkles size={16} className="text-[#C5A059]" />
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {notes.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -634,6 +676,18 @@ function WeddingApp() {
         };
         console.log('Submitting RSVP:', payload);
         await addDoc(collection(db, 'rsvp'), payload);
+
+        // Also save to messages collection if message is provided
+        if (formData.message && formData.message.trim() !== '') {
+          const messagePayload = {
+            name: formData.name,
+            message: formData.message,
+            createdAt: serverTimestamp()
+          };
+          console.log('Submitting message from RSVP:', messagePayload);
+          await addDoc(collection(db, 'messages'), messagePayload);
+        }
+
         setIsRSVPed(true);
         // Smooth scroll to success message
         setTimeout(() => {
@@ -966,6 +1020,7 @@ function WeddingApp() {
               <div className="space-y-3">
                 <label className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-widest text-[#8B8B7A]">
                   <MessageSquare size={12} /> Ucapan / Message (Optional)
+                  <span className="text-[8px] lowercase opacity-60">(akan dipaparkan di Dinding Ucapan)</span>
                 </label>
                 <textarea 
                   value={formData.message}
